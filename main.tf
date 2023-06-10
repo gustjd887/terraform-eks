@@ -13,23 +13,15 @@ module "vpc" {
   enable_dns_hostnames = true
 }
 
-module "security-group" {
-  source  = "terraform-aws-modules/security-group/aws"
-  version = "4.17.2"
-
-  name        = "onboarding-ssh-sg"
-  description = "for ssh"
-  vpc_id      = module.vpc.vpc_id
-
-  ingress_with_cidr_blocks = [
-    {
-      from_port   = 22
-      to_port     = 22
-      protocol    = "tcp"
-      description = "ssh port"
-      cidr_blocks = "0.0.0.0/0"
-    }
-  ]
+resource "aws_security_group" "security_group" {
+  vpc_id = module.vpc.vpc_id
+  ingress {
+    description = "allow ssh from all"
+    from_port = 22
+    to_port = 22
+    protocol = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
 }
 
 module "eks" {
@@ -72,7 +64,7 @@ module "eks" {
 
       remote_access = {
         ec2_ssh_key               = "kuberix-lab"
-        source_security_group_ids = [module.security-group.security_group_id]
+        source_security_group_ids = [aws_security_group.security_group.id]
       }
     }
   }
@@ -143,7 +135,7 @@ module "ec2-instance" {
 
   instance_type = "t2.micro"
   key_name = "kuberix-lab"
-  vpc_security_group_ids = [module.security-group.security_group_id, module.eks.node_security_group_id]
+  vpc_security_group_ids = [aws_security_group.security_group.id, module.eks.node_security_group_id]
   subnet_id = module.vpc.public_subnets[0]
   associate_public_ip_address = true
   ami = "ami-0e05f79e46019bfac"
